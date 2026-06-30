@@ -1,0 +1,34 @@
+name: Keep Alive
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # 每5分钟执行一次
+  workflow_dispatch:          # 支持手动触发
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping services
+        run: |
+          URLS="${{ secrets.KEEPALIVE_URLS }}"
+          
+          if [ -z "$URLS" ]; then
+            echo "No URLs configured. Set KEEPALIVE_URLS secret."
+            exit 1
+          fi
+          
+          IFS=',' read -ra URL_LIST <<< "$URLS"
+          
+          for url in "${URL_LIST[@]}"; do
+            url=$(echo "$url" | xargs)  # trim whitespace
+            echo "Pinging: $url"
+            STATUS=$(curl -o /dev/null -s -w "%{http_code}" \
+              --max-time 30 \
+              --retry 2 \
+              --retry-delay 5 \
+              "$url")
+            echo "  → HTTP $STATUS"
+          done
+          
+          echo "Done."
